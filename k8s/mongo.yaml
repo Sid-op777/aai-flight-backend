@@ -1,0 +1,70 @@
+# 1. Secret: To store the MongoDB root username and password
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mongo-secret
+type: Opaque
+stringData:
+  # You can change these values if you wish
+  MONGO_INITDB_ROOT_USERNAME: "admin"
+  MONGO_INITDB_ROOT_PASSWORD: "password"
+
+---
+# 2. Persistent Volume Claim: A request for storage
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mongo-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+
+---
+# 3. Deployment: How to run the MongoDB container
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mongo-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mongo
+  template:
+    metadata:
+      labels:
+        app: mongo
+    spec:
+      containers:
+      - name: mongo
+        image: mongo:latest
+        ports:
+        - containerPort: 27017
+        envFrom:
+        - secretRef:
+            name: mongo-secret # Load username/password from the secret
+        volumeMounts:
+        - name: mongo-storage
+          mountPath: /data/db # Mount the persistent volume here
+      volumes:
+      - name: mongo-storage
+        persistentVolumeClaim:
+          claimName: mongo-pvc # Use the PVC we defined above
+
+---
+# 4. Service: The stable network address for MongoDB
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-svc # The crucial service name for our connection string
+spec:
+  selector:
+    app: mongo
+  ports:
+    - protocol: TCP
+      port: 27017
+      targetPort: 27017
+  type: ClusterIP

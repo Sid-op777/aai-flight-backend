@@ -1,0 +1,32 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: aai-ingress
+spec:
+  ingressClassName: nginx
+  rules:
+  - http:
+      paths:
+      - path: /api/users 
+        pathType: Prefix 
+        backend:
+          service:
+            name: user-service-svc
+            port:
+              number: 80
+
+      - path: /api/airports
+        pathType: Prefix
+        backend:
+          service:
+            name: airport-service-svc
+            port:
+              number: 80
+
+      - path: /api/reviews
+        pathType: Prefix
+        backend:
+          service:
+            name: review-service-svc
+            port:
+              number: 80

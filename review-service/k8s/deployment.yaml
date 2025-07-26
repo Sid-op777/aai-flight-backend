@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: review-service-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: review-service
+  template:
+    metadata:
+      labels:
+        app: review-service
+    spec:
+      containers:
+      - name: review-service
+        image: siddb/review-service:v1.0.0 # Your new image name
+        ports:
+        - containerPort: 3003 # This service can run on a different port
+        envFrom:
+        - secretRef:
+            name: review-service-secret
