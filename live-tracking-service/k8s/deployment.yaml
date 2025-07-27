@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: live-tracking-service-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: live-tracking-service
+  template:
+    metadata:
+      labels:
+        app: live-tracking-service
+    spec:
+      containers:
+      - name: live-tracking-service
+        image: siddb/live-tracking-service:v1.0.0
+        ports:
+        - containerPort: 3007
+        envFrom:
+        - secretRef:
+            name: live-tracking-service-secret

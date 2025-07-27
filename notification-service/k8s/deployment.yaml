@@ -1,0 +1,20 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service-deployment
+spec:
+  replicas: 1 # We typically only need one listener unless the message volume is very high
+  selector:
+    matchLabels:
+      app: notification-service
+  template:
+    metadata:
+      labels:
+        app: notification-service
+    spec:
+      containers:
+      - name: notification-service
+        image: siddb/notification-service:v1.0.0
+        envFrom:
+        - secretRef:
+            name: notification-service-secret

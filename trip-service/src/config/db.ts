@@ -11,4 +11,5 @@ pool.on('connect', () => {
   console.log('Connected to PostgreSQL database!');
 });
 
+// Export the entire pool to allow for both simple queries and transactions.
 export default pool;

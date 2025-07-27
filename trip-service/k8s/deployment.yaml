@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: trip-service-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: trip-service
+  template:
+    metadata:
+      labels:
+        app: trip-service
+    spec:
+      containers:
+      - name: trip-service
+        image: siddb/trip-service:v1.0.1 # Your image name
+        ports:
+        - containerPort: 3008
+        envFrom:
+        - secretRef:
+            name: trip-service-secret

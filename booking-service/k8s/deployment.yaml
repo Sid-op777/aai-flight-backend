@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: booking-service-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: booking-service
+  template:
+    metadata:
+      labels:
+        app: booking-service
+    spec:
+      containers:
+      - name: booking-service
+        image: siddb/booking-service:v1.0.1 # Make sure to build and push this image
+        ports:
+        - containerPort: 3005 # The port your Node.js app listens on
+        envFrom:
+        - secretRef:
+            name: booking-service-secret

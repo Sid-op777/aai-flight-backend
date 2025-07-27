@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: airport-service
-        image: siddb/airport-service:v1.0.0 # Your image name
+        image: siddb/airport-service:v1.0.1 # Your image name
         ports:
         - containerPort: 3002
         envFrom:

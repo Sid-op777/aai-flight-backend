@@ -30,3 +30,35 @@ spec:
             name: review-service-svc
             port:
               number: 80
+
+      - path: /api/flights
+        pathType: Prefix
+        backend:
+          service:
+            name: flight-service-svc
+            port:
+              number: 80
+
+      - path: /api/bookings
+        pathType: Prefix
+        backend:
+          service:
+            name: booking-service-svc
+            port:
+              number: 80
+
+      - path: /api/weather
+        pathType: Prefix
+        backend:
+          service:
+            name: weather-service-svc
+            port:
+              number: 80
+            
+      - path: /api/tracking
+        pathType: Prefix
+        backend:
+          service:
+            name: live-tracking-service-svc
+            port:
+              number: 80

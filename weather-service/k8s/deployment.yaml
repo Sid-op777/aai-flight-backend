@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: weather-service-deployment
+spec:
+  replicas: 1 # This is a simple service, 1 replica is fine
+  selector:
+    matchLabels:
+      app: weather-service
+  template:
+    metadata:
+      labels:
+        app: weather-service
+    spec:
+      containers:
+      - name: weather-service
+        image: siddb/weather-service:v1.0.0
+        ports:
+        - containerPort: 3006
+        envFrom:
+        - secretRef:
+            name: weather-service-secret

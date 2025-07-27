@@ -11,6 +11,4 @@ pool.on('connect', () => {
   console.log('Connected to PostgreSQL database!');
 });
 
-export default {
-  query: (text: string, params?: any[]) => pool.query(text, params),
-};
+export default pool;
