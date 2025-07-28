@@ -2,7 +2,7 @@ import express from 'express';
 import dotenv from 'dotenv';
 import router from './api/routes/booking.routes';
 import db from './config/db';
-import { connectRabbitMQ } from './config/rabbitmq';
+import { connectRabbitMQ, subscribeToEvents } from './config/rabbitmq';
 
 dotenv.config();
 
@@ -35,3 +35,22 @@ connectRabbitMQ().then(() => {
         console.log(`Booking Service listening on port ${PORT}`);
     });
 });
+
+const startServer = async () => {
+  try {
+    await db.query('SELECT NOW()');
+    console.log('Database connection successful.');
+
+    await connectRabbitMQ();
+    await subscribeToEvents(); // Start listening for events
+
+    app.listen(PORT, () => {
+      console.log(`Booking Service listening on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start Booking Service:', error);
+    process.exit(1);
+  }
+};
+
+startServer();

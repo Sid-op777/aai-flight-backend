@@ -64,7 +64,7 @@ export const createBooking = async (req: IAuthRequest, res: Response, next: Next
     // 3. Insert into the bookings table
     const bookingQuery = `
       INSERT INTO bookings (user_id, flight_id, total_price, booking_status)
-      VALUES ($1, $2, $3, 'CONFIRMED') -- For now, we auto-confirm
+      VALUES ($1, $2, $3, 'PENDING') -- Change 'CONFIRMED' to 'PENDING'
       RETURNING id;
     `;
     const bookingResult = await client.query(bookingQuery, [userId, flightId, totalPrice]);
