@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: booking-service
-        image: siddb/booking-service:v1.0.1 # Make sure to build and push this image
+        image: siddb/booking-service:v1.0.4
         ports:
         - containerPort: 3005 # The port your Node.js app listens on
         envFrom:

@@ -1,9 +1,22 @@
 import { Request, Response, NextFunction } from 'express';
 import db from '../../config/db';
 import { IAuthRequest } from '../middleware/auth.middleware';
+import axios from 'axios';
 
 interface GetReviewsParams {
   iataCode: string;
+}
+
+const USER_SERVICE_URL = 'http://user-service-svc/api/users';
+
+interface EnrichedReview {
+  id: number;
+  airport_iata_code: string;
+  user_id: string;
+  rating: number;
+  comment: string;
+  created_at: string;
+  userName: string; // The new field!
 }
 
 /**
@@ -41,19 +54,44 @@ export const createReview = async (req: IAuthRequest, res: Response, next: NextF
   }
 };
 
+
 /**
  * @desc    Get all reviews for a specific airport
  * @route   GET /api/reviews/:iataCode
  * @access  Public
  */
-export const getReviewsForAirport = async (req: Request<GetReviewsParams>, res: Response, next: NextFunction) => {
+export const getReviewsForAirport = async (req: Request, res: Response, next: NextFunction) => {
   try {
-    const { iataCode } = req.params; 
+    const { iataCode } = req.params;
     
+    // 1. Get reviews from our own database
     const query = 'SELECT * FROM reviews WHERE airport_iata_code = $1 ORDER BY created_at DESC;';
-    const { rows } = await db.query(query, [iataCode.toUpperCase()]);
+    const { rows: reviews } = await db.query(query, [iataCode.toUpperCase()]);
+
+    if (reviews.length === 0) {
+      return res.json([]); // No reviews, return early
+    }
+
+    // 2. Collect all unique user IDs
+    const userIds = [...new Set(reviews.map(review => String(review.user_id)))];
+
+    // 3. Fetch user data in a single batch call from the User Service
+    let userMap: { [key: string]: { fullName: string } } = {};
+    try {
+      const userResponse = await axios.get(`${USER_SERVICE_URL}/batch?ids=${userIds.join(',')}`);
+      userMap = userResponse.data;
+    } catch (error) {
+      console.error("Could not fetch user data from User Service:", error);
+      // We can still proceed, but names will be anonymous.
+    }
     
-    res.json(rows);
+    // 4. "Join" the data by mapping over the reviews and adding the user name
+    const enrichedReviews: EnrichedReview[] = reviews.map(review => ({
+      ...review,
+      userName: userMap[String(review.user_id)]?.fullName || 'Anonymous User'
+    }));
+    
+    res.json(enrichedReviews);
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Server error' });

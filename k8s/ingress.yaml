@@ -2,6 +2,22 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: aai-ingress
+  # --- Add CORS Annotations ---
+  annotations:
+    # This enables CORS for the Ingress rule
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    
+    # This specifies which origins are allowed. For development, we allow our Next.js port.
+    nginx.ingress.kubernetes.io/cors-allow-origin: "http://localhost:3000"
+    
+    # This specifies which HTTP methods are allowed in CORS requests.
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, PUT, POST, DELETE, OPTIONS"
+    
+    # This specifies which HTTP headers can be sent in CORS requests.
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,X-CustomHeader,Keep-Alive,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Authorization"
+    
+    # This allows credentials (like cookies or Authorization headers) to be sent.
+    nginx.ingress.kubernetes.io/cors-allow-credentials: "true"
 spec:
   ingressClassName: nginx
   rules:
@@ -60,5 +76,13 @@ spec:
         backend:
           service:
             name: live-tracking-service-svc
+            port:
+              number: 80
+      
+      - path: /api/trips
+        pathType: Prefix
+        backend: 
+          service:
+            name: trip-service-svc
             port:
               number: 80

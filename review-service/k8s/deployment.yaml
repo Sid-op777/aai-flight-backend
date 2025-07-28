@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: review-service
-        image: siddb/review-service:v1.0.0 # Your new image name
+        image: siddb/review-service:v1.0.2
         ports:
         - containerPort: 3003 # This service can run on a different port
         envFrom:

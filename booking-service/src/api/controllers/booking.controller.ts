@@ -12,6 +12,7 @@ interface Passenger {
   passportNumber?: string;
 }
 
+// Define the type for the flight data we expect back from the flight service
 interface Flight {
   id: number;
   flight_number: string;
@@ -23,8 +24,8 @@ interface Flight {
   price: string;          
 }
 
-// The internal URL for the Flight Service inside Kubernetes
-const FLIGHT_SERVICE_URL = 'http://flight-service-svc/api/flights';
+// CORRECTED: Removed the trailing slash for robust URL joining
+const FLIGHT_SERVICE_URL = 'http://flight-service-svc';
 
 /**
  * @desc    Create a new booking
@@ -32,66 +33,65 @@ const FLIGHT_SERVICE_URL = 'http://flight-service-svc/api/flights';
  * @access  Private
  */
 export const createBooking = async (req: IAuthRequest, res: Response, next: NextFunction) => {
-  const client = await db.connect(); // Use a client for transactions
+  // Use a transaction from the connection pool
+  const client = await db.connect(); 
   try {
     const userId = req.userId;
     const { flightId, passengers } = req.body as { flightId: number; passengers: Passenger[] };
 
-    if (!flightId || !passengers || passengers.length === 0) {
-      return res.status(400).json({ message: 'Flight ID and at least one passenger are required' });
+    if (!flightId || !passengers || !Array.isArray(passengers) || passengers.length === 0) {
+      return res.status(400).json({ message: 'Flight ID and a non-empty array of passengers are required' });
     }
 
     // --- Inter-Service Communication ---
-    // 1. Call the Flight Service to get flight details (and verify it exists)
-    let flightData:Flight;
+    let flightData: Flight;
     try {
-      const response = await axios.get<Flight>(`${FLIGHT_SERVICE_URL}/${flightId}`);
+      console.log(`Fetching flight data for flightId: ${flightId}`);
+      // The path starts with a slash, correctly joining with the base URL
+      const response = await axios.get<Flight>(`${FLIGHT_SERVICE_URL}/api/flights/${flightId}`);
       flightData = response.data;
-      if (!flightData) {
-        return res.status(404).json({ message: 'Flight not found' });
-      }
-    } catch (error) {
-      console.error('Error fetching flight data:', error);
-      return res.status(500).json({ message: 'Could not retrieve flight information' });
+      console.log(`Successfully fetched flight data for ${flightData.flight_number}`);
+    } catch (error: any) {
+      console.error('Error fetching flight data:', error.isAxiosError ? error.message : error);
+      return res.status(500).json({ message: 'Could not retrieve flight information at this time.' });
     }
     
-    // 2. Calculate total price
+    // Calculate total price
     const totalPrice = parseFloat(flightData.price) * passengers.length;
 
     // --- Database Transaction ---
-    await client.query('BEGIN'); // Start transaction
+    await client.query('BEGIN');
 
-    // 3. Insert into the bookings table
+    // Insert into the bookings table
     const bookingQuery = `
       INSERT INTO bookings (user_id, flight_id, total_price, booking_status)
-      VALUES ($1, $2, $3, 'PENDING') -- Change 'CONFIRMED' to 'PENDING'
+      VALUES ($1, $2, $3, 'PENDING')
       RETURNING id;
     `;
     const bookingResult = await client.query(bookingQuery, [userId, flightId, totalPrice]);
     const newBookingId = bookingResult.rows[0].id;
+    console.log(`Created new booking with ID: ${newBookingId}`);
 
-    // 4. Insert each passenger
+    // Insert each passenger
     const passengerQuery = `
       INSERT INTO passengers (booking_id, full_name, email, phone, passport_number)
       VALUES ($1, $2, $3, $4, $5);
     `;
     for (const passenger of passengers) {
-      await client.query(passengerQuery, [
-        newBookingId,
-        passenger.fullName,
-        passenger.email,
-        passenger.phone,
-        passenger.passportNumber,
-      ]);
+      // Add validation for passenger data
+      if (!passenger.fullName || !passenger.email) {
+        throw new Error('Each passenger must have a fullName and email.');
+      }
+      await client.query(passengerQuery, [ newBookingId, passenger.fullName, passenger.email, passenger.phone, passenger.passportNumber ]);
     }
 
-    await client.query('COMMIT'); // Commit transaction
+    await client.query('COMMIT');
 
-    //Publish the event
+    // Publish the event AFTER the transaction is successfully committed
     const eventPayload = {
         bookingId: newBookingId,
         userId: userId,
-        userEmail: 'user@example.com', // In a real app, you'd fetch this from User Service or get it from JWT
+        userEmail: 'user@example.com', // Placeholder
         flightDetails: {
             flightNumber: flightData.flight_number,
             airline: flightData.airline_name,
@@ -104,37 +104,55 @@ export const createBooking = async (req: IAuthRequest, res: Response, next: Next
 
     res.status(201).json({ message: 'Booking created successfully', bookingId: newBookingId });
 
-  } catch (error) {
-    await client.query('ROLLBACK'); // Rollback transaction on error
-    console.error(error);
-    res.status(500).json({ message: 'Server error while creating booking' });
+  } catch (error: any) {
+    await client.query('ROLLBACK');
+    console.error('Booking creation failed, transaction rolled back:', error.message);
+    res.status(500).json({ message: error.message || 'Server error while creating booking' });
   } finally {
-    client.release(); // Release the client back to the pool
+    client.release();
   }
 };
 
-
-/**
- * @desc    Get all bookings for the authenticated user
- * @route   GET /api/bookings/my-bookings
- * @access  Private
- */
 export const getMyBookings = async (req: IAuthRequest, res: Response, next: NextFunction) => {
     try {
         const userId = req.userId;
         const query = `
-            SELECT b.id as booking_id, b.booking_status, b.total_price, b.created_at,
-                   f.flight_number, f.airline_name, f.departure_airport_iata, f.arrival_airport_iata,
-                   f.departure_time, f.arrival_time
+            SELECT 
+                b.id as "bookingId",
+                b.booking_status as status,
+                b.total_price as "totalPrice",
+                b.created_at as "bookingDate",
+                -- We'll generate a mock PNR for display
+                'BK' || LPAD(b.id::text, 6, '0') as pnr,
+                -- Aggregate flight details into a single JSON object
+                json_build_object(
+                    'id', f.id,
+                    'flightNumber', f.flight_number,
+                    'airline', f.airline_name,
+                    'from', f.departure_airport_iata,
+                    'to', f.arrival_airport_iata,
+                    'departureTime', f.departure_time,
+                    'arrivalTime', f.arrival_time,
+                    'duration', (f.arrival_time - f.departure_time)
+                ) as flight,
+                -- Aggregate all passengers for this booking into a JSON array
+                json_agg(
+                    json_build_object(
+                        'fullName', p.full_name,
+                        'email', p.email
+                    )
+                ) as passengers
             FROM bookings b
             JOIN flights f ON b.flight_id = f.id
+            JOIN passengers p ON b.id = p.booking_id
             WHERE b.user_id = $1
+            GROUP BY b.id, f.id -- Group by booking and flight to aggregate passengers
             ORDER BY b.created_at DESC;
         `;
-        const { rows } = await db.query(query, [userId]); 
+        const { rows } = await db.query(query, [userId]);
         res.json(rows);
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ message: 'Server error' });
+        console.error("Error fetching user bookings:", error);
+        res.status(500).json({ message: 'Server error while fetching bookings' });
     }
 };

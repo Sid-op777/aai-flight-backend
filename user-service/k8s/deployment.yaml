@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: user-service
-        image: siddb/user-service:v1.0.4
+        image: siddb/user-service:v1.0.7
         ports:
         - containerPort: 3001
         envFrom:

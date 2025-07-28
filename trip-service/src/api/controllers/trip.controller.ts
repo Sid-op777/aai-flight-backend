@@ -3,27 +3,6 @@ import db from '../../config/db';
 import { IAuthRequest } from '../middleware/auth.middleware';
 import { publishEvent } from '../../config/rabbitmq';
 
-// --- This function MOCKS a lookup to an external airline/GDS system ---
-const mockPnrLookup = (pnr: string, airline: string) => {
-  console.log(`Mocking PNR lookup for PNR: ${pnr}, Airline: ${airline}`);
-  // In a real app, this would be a complex API call.
-  // Here, we return a hardcoded, realistic-looking trip.
-  return {
-    airlineName: "IndiGo",
-    segments: [
-      {
-        flightNumber: '6E555',
-        departureAirportIata: 'DEL',
-        arrivalAirportIata: 'BOM',
-        departureTime: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000).toISOString(), // 2 days from now
-        arrivalTime: new Date(Date.now() + (2 * 24 * 60 * 60 * 1000) + (2 * 60 * 60 * 1000)).toISOString(), // 2 hours later
-        webCheckinLink: 'https://www.goindigo.in/web-check-in.html'
-      }
-    ]
-  };
-};
-
-
 /**
  * @desc    Import a new trip via PNR
  * @route   POST /api/trips/import
@@ -39,8 +18,18 @@ export const importTrip = async (req: IAuthRequest, res: Response, next: NextFun
       return res.status(400).json({ message: 'PNR and airline are required' });
     }
 
-    // 1. "Call" the external system (our mock function)
-    const tripData = mockPnrLookup(pnr, airline);
+    const pnrQuery = 'SELECT airline_name, flight_data FROM mock_pnrs WHERE pnr = $1 AND airline_name ILIKE $2';
+    const pnrResult = await client.query(pnrQuery, [pnr.toUpperCase(), `%${airline}%`]);
+
+    if (pnrResult.rows.length === 0) {
+      return res.status(404).json({ message: 'Could not find a trip with the provided PNR and airline.' });
+    }
+
+    const mockData = pnrResult.rows[0];
+    const tripData = {
+        airlineName: mockData.airline_name,
+        segments: mockData.flight_data.segments 
+    };
     
     await client.query('BEGIN'); // Start transaction
 

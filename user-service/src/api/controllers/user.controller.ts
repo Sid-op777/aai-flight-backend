@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 import { User, IUser } from '../../models/User.model';
 import { registerSchema, loginSchema, updateUserSchema } from '../validators/user.validator';
+import { Types } from 'mongoose';
 
 const generateToken = (id: string) => {
   return jwt.sign({ id }, process.env.JWT_SECRET!, {
@@ -134,6 +135,52 @@ export const updateUserProfile = async (req: IAuthRequest, res: Response, next: 
       email: updatedUser.email,
       phone: updatedUser.phone,
     });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get user data for a list of IDs (for internal service use)
+ * @route   GET /api/users/batch
+ * @access  Internal
+ */
+export const getUsersByIds = async (req: Request, res: Response, next: NextFunction) => {
+  try {
+    const idsString = req.query.ids as string;
+    if (!idsString) {
+      return res.json({});
+    }
+    const ids = idsString.split(',');
+
+    const validObjectIds = ids
+      .map(id => {
+        try {
+          return new Types.ObjectId(id);
+        } catch (error) {
+          return null;
+        }
+      })
+      .filter(id => id !== null);
+    // -----------------------
+
+    if (validObjectIds.length === 0) {
+        return res.json({});
+    }
+
+    // Use the array of ObjectIds in the query
+    const users = await User.find({ '_id': { $in: validObjectIds } }).select('fullName email');
+    
+    // The rest of the function remains the same
+    const userMap: { [key: string]: { fullName: string; email: string } } = {};
+    users.forEach(user => {
+      userMap[user._id.toString()] = {
+        fullName: user.fullName,
+        email: user.email
+      };
+    });
+
+    res.json(userMap);
   } catch (error) {
     next(error);
   }

@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: trip-service
-        image: siddb/trip-service:v1.0.1 # Your image name
+        image: siddb/trip-service:v1.0.2 # Your image name
         ports:
         - containerPort: 3008
         envFrom:
